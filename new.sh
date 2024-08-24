@@ -262,7 +262,18 @@ remove_tunnels() {
     sudo ip link del GRE6Tun_To_IR 2>/dev/null
     sudo iptables -t nat -D PREROUTING -j DNAT --to-destination 10.10.10.2 2>/dev/null
     sudo iptables -t nat -D POSTROUTING -j MASQUERADE 2>/dev/null
-
+    sudo ip tunnel del 6to4_To_IR2 2>/dev/null
+    sudo ip -6 tunnel del GRE6Tun_To_IR2 2>/dev/null
+    sudo ip link del 6to4_To_IR2 2>/dev/null
+    sudo ip link del GRE6Tun_To_IR2 2>/dev/null
+    sudo iptables -t nat -D PREROUTING -j DNAT --to-destination 10.10.10.4 2>/dev/null
+    sudo iptables -t nat -D POSTROUTING -j MASQUERADE 2>/dev/null
+    sudo ip tunnel del 6to4_To_IR1 2>/dev/null
+    sudo ip -6 tunnel del GRE6Tun_To_IR1 2>/dev/null
+    sudo ip link del 6to4_To_IR1 2>/dev/null
+    sudo ip link del GRE6Tun_To_IR1 2>/dev/null
+    sudo iptables -t nat -D PREROUTING -j DNAT --to-destination 10.10.10.2 2>/dev/null
+    sudo iptables -t nat -D POSTROUTING -j MASQUERADE 2>/dev/null
     # Update /etc/rc.local
     echo -e '#! /bin/bash\n\nexit 0' | sudo tee /etc/rc.local > /dev/null
     sudo chmod +x /etc/rc.local
