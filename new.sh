@@ -252,11 +252,24 @@ EOF
         ;;
     3)
         # حذف تونل‌ها
-        echo "Removing tunnels..."
-        sudo ip tunnel del 6to4_To_IR
-        sudo ip -6 tunnel del GRE6Tun_To_IR
-        echo "Tunnels removed."
-        ;;
+remove_tunnels() {
+    echo "Removing tunnels..."
+
+    # Remove the tunnels
+    sudo ip tunnel del 6to4_To_IR 2>/dev/null
+    sudo ip -6 tunnel del GRE6Tun_To_IR 2>/dev/null
+    sudo ip link del 6to4_To_IR 2>/dev/null
+    sudo ip link del GRE6Tun_To_IR 2>/dev/null
+    sudo iptables -t nat -D PREROUTING -j DNAT --to-destination 10.10.10.2 2>/dev/null
+    sudo iptables -t nat -D POSTROUTING -j MASQUERADE 2>/dev/null
+
+    # Update /etc/rc.local
+    echo -e '#! /bin/bash\n\nexit 0' | sudo tee /etc/rc.local > /dev/null
+    sudo chmod +x /etc/rc.local
+
+    echo "Tunnels removed and /etc/rc.local updated."
+}
+
     4)
         # فعال‌سازی BBR
         echo "Activating BBR..."
