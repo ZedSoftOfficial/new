@@ -1,80 +1,21 @@
 #!/bin/bash
 
-# نمایش منوی اصلی
-echo "1) 6to4 multi server (1 outside 2 Iran)"
-echo "2) 6to4"
-echo "3) Remove tunnels"
-echo "4) Enable BBR"
-echo "5) Fix Whatsapp Time"
-echo "6) Optimize"
-echo "7) Install x-ui"
-echo "8) Change NameServer"
-echo "9) Disable IPv6 - After server reboot IPv6 is activated"
-read -p "Select an option (1-9): " server_choice
-
-# تابع بهینه‌سازی
-optimize() {
-    USER_CONF="/etc/systemd/user.conf"
-    SYSTEM_CONF="/etc/systemd/system.conf"
-    LIMITS_CONF="/etc/security/limits.conf"
-    SYSCTL_CONF="/etc/sysctl.d/local.conf"
-    TEMP_USER_CONF=$(mktemp)
-    TEMP_SYSTEM_CONF=$(mktemp)
-
-    # تابع اضافه کردن خط در صورت عدم وجود
-    add_line_if_not_exists() {
-        local file="$1"
-        local line="$2"
-        local temp_file="$3"
-
-        if [ -f "$file" ]; then
-            cp "$file" "$temp_file"
-            if ! grep -q "$line" "$file"; then
-                sed -i '/^\[Manager\]/a '"$line" "$temp_file"
-                sudo mv "$temp_file" "$file"
-                echo "Added '$line' to $file"
-            else
-                echo "The line '$line' already exists in $file"
-                rm "$temp_file"
-            fi
-        else
-            echo "$file does not exist."
-            rm "$temp_file"
-        fi
-    }
-
-    # بهینه‌سازی user.conf
-    add_line_if_not_exists "$USER_CONF" "DefaultLimitNOFILE=1024000" "$TEMP_USER_CONF"
-
-    # بهینه‌سازی system.conf
-    add_line_if_not_exists "$SYSTEM_CONF" "DefaultLimitNOFILE=1024000" "$TEMP_SYSTEM_CONF"
-
-    # بهینه‌سازی limits.conf
-    if [ -f "$LIMITS_CONF" ]; then
-        cat <<EOF | sudo tee -a "$LIMITS_CONF"
-* hard nofile 1024000
-* soft nofile 1024000
-root hard nofile 1024000
-root soft nofile 1024000
-EOF
-        echo "Added limits to $LIMITS_CONF"
-    else
-        echo "$LIMITS_CONF does not exist."
+# تابع برای اضافه کردن دستورات به rc.local
+setup_rc_local() {
+    commands="$1"
+    
+    # بررسی می‌کنیم که فایل rc.local وجود دارد یا خیر
+    if [ ! -f /etc/rc.local ]; then
+        echo "#!/bin/bash" | sudo tee /etc/rc.local > /dev/null
+        sudo chmod +x /etc/rc.local
     fi
-
-    # بهینه‌سازی sysctl.d/local.conf
-    cat <<EOF | sudo tee "$SYSCTL_CONF"
-# max open files
-fs.file-max = 1024000
-EOF
-    echo "Added sysctl settings to $SYSCTL_CONF"
-
-    # اعمال تغییرات sysctl
-    sudo sysctl --system
-    echo "Sysctl changes applied."
+    
+    # اضافه کردن دستورات به rc.local
+    sudo bash -c "echo \"$commands\" >> /etc/rc.local"
+    echo "Commands added to /etc/rc.local."
 }
 
-# تابع نصب x-ui
+# Function to install x-ui
 install_x_ui() {
     echo "Choose the version of x-ui to install:"
     echo "1) alireza"
@@ -92,7 +33,98 @@ install_x_ui() {
     fi
 }
 
-# تابع غیرفعال‌سازی IPv6
+# Function to handle Optimize option
+optimize() {
+    USER_CONF="/etc/systemd/user.conf"
+    SYSTEM_CONF="/etc/systemd/system.conf"
+    LIMITS_CONF="/etc/security/limits.conf"
+    SYSCTL_CONF="/etc/sysctl.d/local.conf"
+    TEMP_USER_CONF=$(mktemp)
+    TEMP_SYSTEM_CONF=$(mktemp)
+
+    # Function to add line if not exists
+    add_line_if_not_exists() {
+        local file="$1"
+        local line="$2"
+        local temp_file="$3"
+
+        if [ -f "$file" ];then
+            cp "$file" "$temp_file"
+            if ! grep -q "$line" "$file"; then
+                sed -i '/^\[Manager\]/a '"$line" "$temp_file"
+                sudo mv "$temp_file" "$file"
+                echo "Added '$line' to $file"
+            else
+                echo "The line '$line' already exists in $file"
+                rm "$temp_file"
+            fi
+        else
+            echo "$file does not exist."
+            rm "$temp_file"
+        fi
+    }
+
+    # Optimize user.conf
+    add_line_if_not_exists "$USER_CONF" "DefaultLimitNOFILE=1024000" "$TEMP_USER_CONF"
+
+    # Optimize system.conf
+    add_line_if_not_exists "$SYSTEM_CONF" "DefaultLimitNOFILE=1024000" "$TEMP_SYSTEM_CONF"
+
+    # Optimize limits.conf
+    if [ -f "$LIMITS_CONF" ];then
+        cat <<EOF | sudo tee -a "$LIMITS_CONF"
+* hard nofile 1024000
+* soft nofile 1024000
+root hard nofile 1024000
+root soft nofile 1024000
+EOF
+        echo "Added limits to $LIMITS_CONF"
+    else
+        echo "$LIMITS_CONF does not exist."
+    fi
+
+    # Optimize sysctl.d/local.conf
+    sudo bash -c "cat <<EOF > $SYSCTL_CONF
+fs.file-max = 2097152
+net.core.netdev_max_backlog = 262144
+net.core.rmem_default = 8388608
+net.core.rmem_max = 67108864
+net.core.somaxconn = 4096
+net.core.wmem_default = 8388608
+net.core.wmem_max = 67108864
+net.ipv4.ip_forward = 1
+net.ipv4.ip_local_port_range = 1024 65535
+net.ipv4.tcp_congestion_control = bbr
+net.ipv4.tcp_fin_timeout = 15
+net.ipv4.tcp_keepalive_time = 300
+net.ipv4.tcp_max_orphans = 3276800
+net.ipv4.tcp_max_syn_backlog = 262144
+net.ipv4.tcp_max_tw_buckets = 6000000
+net.ipv4.tcp_mem = 94500000 915000000 927000000
+net.ipv4.tcp_mtu_probing = 1
+net.ipv4.tcp_rmem = 4096 87380 67108864
+net.ipv4.tcp_retries2 = 8
+net.ipv4.tcp_sack = 1
+net.ipv4.tcp_syn_retries = 5
+net.ipv4.tcp_synack_retries = 2
+net.ipv4.tcp_timestamps = 1
+net.ipv4.tcp_tw_reuse = 1
+net.ipv4.tcp_wmem = 4096 65536 67108864
+net.ipv4.udp_mem = 65536 131072 262144
+net.ipv4.udp_rmem_min = 8192
+net.ipv4.udp_wmem_min = 8192
+vm.min_free_kbytes = 65536
+EOF"
+
+    sudo systemctl daemon-reload
+    sudo systemctl restart systemd-journald
+    sudo systemctl restart systemd
+    sudo sysctl --system
+
+    echo "System optimized successfully."
+}
+
+# Function to disable IPv6
 disable_ipv6() {
     commands=$(cat <<EOF
 sudo sysctl -w net.ipv6.conf.all.disable_ipv6=1
@@ -104,6 +136,18 @@ EOF
     eval "$commands"
     echo "IPv6 has been disabled. This change is temporary and will revert after reboot."
 }
+
+# نمایش منوی اصلی
+echo "1) 6to4 multi server (1 outside 2 Iran)"
+echo "2) 6to4"
+echo "3) Remove tunnels"
+echo "4) Enable BBR"
+echo "5) Fix Whatsapp Time"
+echo "6) Optimize"
+echo "7) Install x-ui"
+echo "8) Change NameServer"
+echo "9) Disable IPv6 - After server reboot IPv6 is activated"
+read -p "Select an option (1-9): " server_choice
 
 # اجرای گزینه انتخاب شده
 case $server_choice in
@@ -120,9 +164,7 @@ case $server_choice in
             read -p "Enter the IP Iran1: " ipiran1
             read -p "Enter the IP Iran2: " ipiran2
 
-            cat <<EOL > /etc/rc.local
-#!/bin/bash
-# تنظیمات تونل برای اولین سرور ایران
+            commands=$(cat <<EOL
 ip tunnel add 6to4_To_IR1 mode sit remote $ipiran1 local $ipkharej1
 ip -6 addr add 2002:480:1f10:e1f::2/64 dev 6to4_To_IR1
 ip link set 6to4_To_IR1 mtu 1480
@@ -133,7 +175,6 @@ ip addr add 10.10.10.2/30 dev GRE6Tun_To_IR1
 ip link set GRE6Tun_To_IR1 mtu 1436
 ip link set GRE6Tun_To_IR1 up
 
-# تنظیمات تونل برای دومین سرور ایران
 ip tunnel add 6to4_To_IR2 mode sit remote $ipiran2 local $ipkharej1
 ip -6 addr add 2002:480:1f10:e1f::3/64 dev 6to4_To_IR2
 ip link set 6to4_To_IR2 mtu 1480
@@ -144,7 +185,10 @@ ip addr add 10.10.10.4/30 dev GRE6Tun_To_IR2
 ip link set GRE6Tun_To_IR2 mtu 1436
 ip link set GRE6Tun_To_IR2 up
 EOL
+            )
 
+            eval "$commands"
+            setup_rc_local "$commands"
             echo "Commands executed for the outside server with Iran1 and Iran2."
         elif [ "$server_option" -eq 2 ]; then
             echo "Iran1 server selected."
