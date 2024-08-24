@@ -191,7 +191,7 @@ read -p "Select an option (1-9): " server_choice
 case $server_choice in
     1)
         # 6to4 multi server
-        echo "Which server is this?"
+        echo "Choose the type of server:"
         echo "1) Outside"
         echo "2) Iran1"
         echo "3) Iran2"
@@ -202,7 +202,7 @@ case $server_choice in
         read -p "Enter the IP Iran1: " ipiran1
         read -p "Enter the IP Iran2: " ipiran2
 
-        commands=$(cat <<EOF
+            commands=$(cat <<EOF
 ip tunnel add 6to4_To_IR1 mode sit remote $ipiran1 local $ipkharej1
 ip -6 addr add 2002:480:1f10:e1f::2/64 dev 6to4_To_IR1
 ip link set 6to4_To_IR1 mtu 1480
@@ -223,11 +223,10 @@ ip addr add 10.10.11.2/30 dev GRE6Tun_To_IR2
 ip link set GRE6Tun_To_IR2 mtu 1436
 ip link set GRE6Tun_To_IR2 up
 EOF
-
             )
 
-        chmod +x /etc/rc.local
-        echo "Configuration for Outside saved to /etc/rc.local and the file has been made executable."
+            setup_rc_local "$commands"
+            echo "Commands executed for the outside server."
 
     elif [ "$server_option" -eq 2 ]; then
         # برای سرور Iran1
