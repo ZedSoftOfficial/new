@@ -203,8 +203,6 @@ case $server_choice in
         read -p "Enter the IP Iran2: " ipiran2
 
         commands=$(cat <<EOF
-#!/bin/bash
-		
 ip tunnel add 6to4_To_IR1 mode sit remote $ipiran1 local $ipkharej1
 ip -6 addr add 2002:480:1f10:e1f::2/64 dev 6to4_To_IR1
 ip link set 6to4_To_IR1 mtu 1480
