@@ -30,16 +30,26 @@ remove_tunnels() {
 
 # تابع برای اضافه کردن دستورات به rc.local
 setup_rc_local() {
-    commands="$1"
+    new_commands="$1"
     
-    # بررسی می‌کنیم که فایل rc.local وجود دارد یا خیر
-    if [ ! -f /etc/rc.local ]; then
-        echo "#!/bin/bash" | sudo tee /etc/rc.local > /dev/null
-        sudo chmod +x /etc/rc.local
+    # خواندن محتوای فعلی فایل rc.local
+    if [ -f /etc/rc.local ]; then
+        current_content=$(cat /etc/rc.local)
+        
+        # بررسی وجود shebang و exit 0 در فایل
+        if [[ "$current_content" == "#! /bin/bash" && "$current_content" == *"exit 0"* ]]; then
+            # قرار دادن دستورات جدید بین shebang و exit 0
+            echo -e "#! /bin/bash\n\n$new_commands\n\nexit 0" | sudo tee /etc/rc.local > /dev/null
+        else
+            # اگر فایل rc.local به درستی تنظیم نشده، آن را بازنویسی کنیم
+            echo -e "#! /bin/bash\n\n$new_commands\n\nexit 0" | sudo tee /etc/rc.local > /dev/null
+        fi
+    else
+        # اگر فایل rc.local وجود ندارد، آن را ایجاد و تنظیم کنیم
+        echo -e "#! /bin/bash\n\n$new_commands\n\nexit 0" | sudo tee /etc/rc.local > /dev/null
     fi
     
-    # اضافه کردن دستورات به rc.local
-    sudo bash -c "echo \"$commands\" >> /etc/rc.local"
+    sudo chmod +x /etc/rc.local
     echo "Commands added to /etc/rc.local."
 }
 
@@ -181,20 +191,17 @@ read -p "Select an option (1-9): " server_choice
 case $server_choice in
     1)
         # 6to4 multi server
-        echo "Which server is this?"
+        echo "Choose the type of server:"
         echo "1) Outside"
-        echo "2) Iran1"
-        echo "3) Iran2"
-        read -p "Select an option (1-3): " server_option
+        echo "2) Iran"
+        read -p "Select an option (1 or 2): " server_option
 
         if [ "$server_option" -eq 1 ]; then
-            # اجرای 6to4 multi server برای خارج از ایران
-            read -p "Enter the IP outside: " ipkharej1
-            read -p "Enter the IP Iran1: " ipiran1
-            read -p "Enter the IP Iran2: " ipiran2
+            read -p "Enter the IP outside: " ipkharej
+            read -p "Enter the IP Iran: " ipiran
 
-            commands=$(cat <<EOL
-ip tunnel add 6to4_To_IR1 mode sit remote $ipiran1 local $ipkharej1
+            commands=$(cat <<EOF
+ip tunnel add 6to4_To_IR1 mode sit remote $ipiran local $ipkharej
 ip -6 addr add 2002:480:1f10:e1f::2/64 dev 6to4_To_IR1
 ip link set 6to4_To_IR1 mtu 1480
 ip link set 6to4_To_IR1 up
@@ -204,7 +211,7 @@ ip addr add 10.10.10.2/30 dev GRE6Tun_To_IR1
 ip link set GRE6Tun_To_IR1 mtu 1436
 ip link set GRE6Tun_To_IR1 up
 
-ip tunnel add 6to4_To_IR2 mode sit remote $ipiran2 local $ipkharej1
+ip tunnel add 6to4_To_IR2 mode sit remote $ipiran local $ipkharej
 ip -6 addr add 2002:480:1f10:e1f::3/64 dev 6to4_To_IR2
 ip link set 6to4_To_IR2 mtu 1480
 ip link set 6to4_To_IR2 up
@@ -213,18 +220,32 @@ ip -6 tunnel add GRE6Tun_To_IR2 mode ip6gre remote 2002:480:1f10:e1f::4 local 20
 ip addr add 10.10.10.4/30 dev GRE6Tun_To_IR2
 ip link set GRE6Tun_To_IR2 mtu 1436
 ip link set GRE6Tun_To_IR2 up
-EOL
+EOF
             )
 
-            eval "$commands"
             setup_rc_local "$commands"
             echo "Commands executed for the outside server with Iran1 and Iran2."
         elif [ "$server_option" -eq 2 ]; then
-            echo "Iran1 server selected."
-        elif [ "$server_option" -eq 3 ]; then
-            echo "Iran2 server selected."
+            read -p "Enter the IP Iran: " ipiran
+            read -p "Enter the IP outside: " ipkharej
+
+            commands=$(cat <<EOF
+ip tunnel add 6to4_To_IR mode sit remote $ipkharej local $ipiran
+ip -6 addr add 2009:499:1d10:e1d::2/64 dev 6to4_To_IR
+ip link set 6to4_To_IR mtu 1480
+ip link set 6to4_To_IR up
+
+ip -6 tunnel add GRE6Tun_To_IR mode ip6gre remote 2009:499:1d10:e1d::1 local 2009:499:1d10:e1d::2
+ip addr add 180.18.18.2/30 dev GRE6Tun_To_IR
+ip link set GRE6Tun_To_IR mtu 1436
+ip link set GRE6Tun_To_IR up
+EOF
+            )
+
+            setup_rc_local "$commands"
+            echo "Commands executed for the Iran server."
         else
-            echo "Invalid option. Please select 1, 2, or 3."
+            echo "Invalid option. Please select 1 or 2."
         fi
         ;;
     2)
@@ -251,7 +272,6 @@ ip link set GRE6Tun_To_IR up
 EOF
             )
 
-            eval "$commands"
             setup_rc_local "$commands"
             echo "Commands executed for the outside server."
 
@@ -272,7 +292,6 @@ ip link set GRE6Tun_To_KH up
 EOF
             )
 
-            eval "$commands"
             setup_rc_local "$commands"
             echo "Commands executed for the Iran server."
         else
