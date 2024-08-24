@@ -1,21 +1,6 @@
 #!/bin/bash
 
-# تابع برای اضافه کردن دستورات به rc.local
-setup_rc_local() {
-    commands="$1"
-    
-    # بررسی می‌کنیم که فایل rc.local وجود دارد یا خیر
-    if [ ! -f /etc/rc.local ]; then
-        echo "#!/bin/bash" | sudo tee /etc/rc.local > /dev/null
-        sudo chmod +x /etc/rc.local
-    fi
-    
-    # اضافه کردن دستورات به rc.local
-    sudo bash -c "echo \"$commands\" >> /etc/rc.local"
-    echo "Commands added to /etc/rc.local."
-}
-
-# تابع برای حذف تونل‌ها
+# تابع برای حذف تونل‌ها و پاک‌سازی فایل rc.local
 remove_tunnels() {
     echo "Removing tunnels..."
 
@@ -31,19 +16,31 @@ remove_tunnels() {
     sudo ip tunnel del 6to4_To_IR2 2>/dev/null
     sudo ip -6 tunnel del GRE6Tun_To_IR2 2>/dev/null
 
-    # پاک‌کردن دستورات مربوط به تونل‌ها از /etc/rc.local
+    # پاک‌کردن محتوای فایل /etc/rc.local
     if [ -f /etc/rc.local ]; then
-        sudo sed -i '/ip tunnel add 6to4_To_IR1/d' /etc/rc.local
-        sudo sed -i '/ip -6 tunnel add GRE6Tun_To_IR1/d' /etc/rc.local
-        sudo sed -i '/ip tunnel add 6to4_To_IR2/d' /etc/rc.local
-        sudo sed -i '/ip -6 tunnel add GRE6Tun_To_IR2/d' /etc/rc.local
-        sudo sed -i '/ip addr add 2002:480:1f10:e1f::2\/64/d' /etc/rc.local
-        sudo sed -i '/ip addr add 10.10.10.2\/30/d' /etc/rc.local
-        sudo sed -i '/ip addr add 2002:480:1f10:e1f::3\/64/d' /etc/rc.local
-        sudo sed -i '/ip addr add 10.10.10.4\/30/d' /etc/rc.local
+        echo -e "#! /bin/bash\n\nexit 0" | sudo tee /etc/rc.local > /dev/null
+        sudo chmod +x /etc/rc.local
+        echo "Content of /etc/rc.local replaced with the default script."
+    else
+        echo "/etc/rc.local does not exist."
     fi
 
     echo "Tunnels removed."
+}
+
+# تابع برای اضافه کردن دستورات به rc.local
+setup_rc_local() {
+    commands="$1"
+    
+    # بررسی می‌کنیم که فایل rc.local وجود دارد یا خیر
+    if [ ! -f /etc/rc.local ]; then
+        echo "#!/bin/bash" | sudo tee /etc/rc.local > /dev/null
+        sudo chmod +x /etc/rc.local
+    fi
+    
+    # اضافه کردن دستورات به rc.local
+    sudo bash -c "echo \"$commands\" >> /etc/rc.local"
+    echo "Commands added to /etc/rc.local."
 }
 
 # Function to install x-ui
