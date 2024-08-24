@@ -197,14 +197,15 @@ case $server_choice in
         echo "3) Iran2"
         read -p "Select an option (1-3): " server_option
 
-    elif [ "$server_option" -eq 2 ]; then
-        # برای سرور Iran1
+    if [ "$server_option" -eq 1 ]; then
         read -p "Enter the IP Outside: " ipkharej1
         read -p "Enter the IP Iran1: " ipiran1
         read -p "Enter the IP Iran2: " ipiran2
 
         # ایجاد محتوای جدید برای فایل rc.local
         cat <<EOL > /etc/rc.local
+#!/bin/bash
+
 ip tunnel add 6to4_To_IR1 mode sit remote $ipiran1 local $ipkharej1
 ip -6 addr add 2002:480:1f10:e1f::2/64 dev 6to4_To_IR1
 ip link set 6to4_To_IR1 mtu 1480
