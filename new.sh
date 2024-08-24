@@ -137,6 +137,27 @@ EOF
     echo "IPv6 has been disabled. This change is temporary and will revert after reboot."
 }
 
+# تابع برای حذف تونل‌ها
+remove_tunnels() {
+    echo "Removing tunnels..."
+
+    # حذف تونل‌های 6to4 و GRE
+    sudo ip tunnel del 6to4_To_IR1 2>/dev/null
+    sudo ip -6 tunnel del GRE6Tun_To_IR1 2>/dev/null
+    sudo ip tunnel del 6to4_To_IR2 2>/dev/null
+    sudo ip -6 tunnel del GRE6Tun_To_IR2 2>/dev/null
+
+    # پاک‌کردن دستورات مربوط به تونل‌ها از /etc/rc.local
+    if [ -f /etc/rc.local ]; then
+        sudo sed -i '/ip tunnel add 6to4_To_IR1/d' /etc/rc.local
+        sudo sed -i '/ip -6 tunnel add GRE6Tun_To_IR1/d' /etc/rc.local
+        sudo sed -i '/ip tunnel add 6to4_To_IR2/d' /etc/rc.local
+        sudo sed -i '/ip -6 tunnel add GRE6Tun_To_IR2/d' /etc/rc.local
+    fi
+
+    echo "Tunnels removed."
+}
+
 # نمایش منوی اصلی
 echo "1) 6to4 multi server (1 outside 2 Iran)"
 echo "2) 6to4"
@@ -252,35 +273,8 @@ EOF
         ;;
     3)
         # حذف تونل‌ها
-remove_tunnels() {
-    echo "Removing tunnels..."
-
-    # Remove the tunnels
-    sudo ip tunnel del 6to4_To_IR 2>/dev/null
-    sudo ip -6 tunnel del GRE6Tun_To_IR 2>/dev/null
-    sudo ip link del 6to4_To_IR 2>/dev/null
-    sudo ip link del GRE6Tun_To_IR 2>/dev/null
-    sudo iptables -t nat -D PREROUTING -j DNAT --to-destination 10.10.10.2 2>/dev/null
-    sudo iptables -t nat -D POSTROUTING -j MASQUERADE 2>/dev/null
-    sudo ip tunnel del 6to4_To_IR2 2>/dev/null
-    sudo ip -6 tunnel del GRE6Tun_To_IR2 2>/dev/null
-    sudo ip link del 6to4_To_IR2 2>/dev/null
-    sudo ip link del GRE6Tun_To_IR2 2>/dev/null
-    sudo iptables -t nat -D PREROUTING -j DNAT --to-destination 10.10.10.4 2>/dev/null
-    sudo iptables -t nat -D POSTROUTING -j MASQUERADE 2>/dev/null
-    sudo ip tunnel del 6to4_To_IR1 2>/dev/null
-    sudo ip -6 tunnel del GRE6Tun_To_IR1 2>/dev/null
-    sudo ip link del 6to4_To_IR1 2>/dev/null
-    sudo ip link del GRE6Tun_To_IR1 2>/dev/null
-    sudo iptables -t nat -D PREROUTING -j DNAT --to-destination 10.10.10.2 2>/dev/null
-    sudo iptables -t nat -D POSTROUTING -j MASQUERADE 2>/dev/null
-    # Update /etc/rc.local
-    echo -e '#! /bin/bash\n\nexit 0' | sudo tee /etc/rc.local > /dev/null
-    sudo chmod +x /etc/rc.local
-
-    echo "Tunnels removed and /etc/rc.local updated."
-}
-
+        remove_tunnels
+        ;;
     4)
         # فعال‌سازی BBR
         echo "Activating BBR..."
