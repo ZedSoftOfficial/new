@@ -147,86 +147,15 @@ EOF
         ;;
     6)
         # بهینه‌سازی
-        # Function to handle Optimize option
-optimize() {
-    USER_CONF="/etc/systemd/user.conf"
-    SYSTEM_CONF="/etc/systemd/system.conf"
-    LIMITS_CONF="/etc/security/limits.conf"
-    SYSCTL_CONF="/etc/sysctl.d/local.conf"
-    TEMP_USER_CONF=$(mktemp)
-    TEMP_SYSTEM_CONF=$(mktemp)
-
-    # Function to add line if not exists
-    add_line_if_not_exists() {
-        local file="$1"
-        local line="$2"
-        local temp_file="$3"
-
-        if [ -f "$file" ];then
-            cp "$file" "$temp_file"
-            if ! grep -q "$line" "$file"; then
-                sed -i '/^\[Manager\]/a '"$line" "$temp_file"
-                sudo mv "$temp_file" "$file"
-                echo "Added '$line' to $file"
-            else
-                echo "The line '$line' already exists in $file"
-                rm "$temp_file"
-            fi
-        else
-            echo "$file does not exist."
-            rm "$temp_file"
-        fi
-    }
-
-    # Optimize user.conf
-    add_line_if_not_exists "$USER_CONF" "DefaultLimitNOFILE=1024000" "$TEMP_USER_CONF"
-
-    # Optimize system.conf
-    add_line_if_not_exists "$SYSTEM_CONF" "DefaultLimitNOFILE=1024000" "$TEMP_SYSTEM_CONF"
-
-    # Optimize limits.conf
-    if [ -f "$LIMITS_CONF" ];then
-        cat <<EOF | sudo tee -a "$LIMITS_CONF"
-* hard nofile 1024000
-* soft nofile 1024000
-root hard nofile 1024000
-root soft nofile 1024000
-EOF
-        echo "Added limits to $LIMITS_CONF"
-    else
-        echo "$LIMITS_CONF does not exist."
-    fi
-
-    # Optimize sysctl.d/local.conf
-    cat <<EOF | sudo tee "$SYSCTL_CONF"
-# max open files
-fs.file-max = 1024000
-EOF
-    echo "Added sysctl settings to $SYSCTL_CONF"
-
-    # Apply sysctl changes
-    sudo sysctl --system
-    echo "Sysctl changes applied."
-}
-
+        echo "Optimizing system..."
+        wget -O optimize.sh "https://github.com/fscarmen/tools/raw/main/Optimize.sh" && chmod +x optimize.sh && ./optimize.sh
+        ;;
     7)
         # نصب x-ui
-install_x_ui() {
-    echo "Choose the version of x-ui to install:"
-    echo "1) alireza"
-    echo "2) MHSanaei"
-    read -p "Select an option (1 or 2): " xui_choice
-
-    if [ "$xui_choice" -eq 1 ]; then
-        bash <(curl -Ls https://raw.githubusercontent.com/alireza0/x-ui/master/install.sh)
-        echo "alireza version of x-ui installed."
-    elif [ "$xui_choice" -eq 2 ]; then
-        bash <(curl -Ls https://raw.githubusercontent.com/mhsanaei/3x-ui/master/install.sh)
-        echo "MHSanaei version of x-ui installed."
-    else
-        echo "Invalid option. Please select 1 or 2."
-    fi
-}
+        echo "Installing x-ui..."
+        bash <(curl -Ls https://raw.githubusercontent.com/vaxilu/x-ui/master/install.sh)
+        echo "x-ui installed."
+        ;;
     8)
         # تغییر NameServer
         echo "Current DNS: $(cat /etc/resolv.conf | grep nameserver)"
@@ -236,36 +165,12 @@ install_x_ui() {
         ;;
     9)
         # غیرفعال‌سازی IPv6
-# Function to disable IPv6
-disable_ipv6() {
-    commands=$(cat <<EOF
-sudo sysctl -w net.ipv6.conf.all.disable_ipv6=1
-sudo sysctl -w net.ipv6.conf.default.disable_ipv6=1
-sudo sysctl -w net.ipv6.conf.lo.disable_ipv6=1
-EOF
-)
-
-    eval "$commands"
-    echo "IPv6 has been disabled. This change is temporary and will revert after reboot."
-}
-# Function to change NameServer
-change_nameserver() {
-    FILE="/etc/resolv.conf"
-    if [ -f "$FILE" ]; then
-        # Backup the original file
-        sudo cp "$FILE" "${FILE}.bak"
-
-        # Remove existing nameserver lines
-        sudo sed -i '/^nameserver /d' "$FILE"
-
-        # Add new nameserver lines
-        echo -e "nameserver 8.8.8.8\nnameserver 1.1.1.1" | sudo tee -a "$FILE" > /dev/null
-
-        echo "NameServers have been updated."
-    else
-        echo "$FILE does not exist."
-    fi
-}
+        echo "Disabling IPv6..."
+        sudo sysctl -w net.ipv6.conf.all.disable_ipv6=1
+        sudo sysctl -w net.ipv6.conf.default.disable_ipv6=1
+        echo "IPv6 disabled. Note: It will be reactivated after reboot."
+        ;;
+    *)
         echo "Invalid option. Please select a number between 1 and 9."
         ;;
 esac
