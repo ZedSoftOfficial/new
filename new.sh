@@ -12,6 +12,99 @@ echo "8) Change NameServer"
 echo "9) Disable IPv6 - After server reboot IPv6 is activated"
 read -p "Select an option (1-9): " server_choice
 
+# تابع بهینه‌سازی
+optimize() {
+    USER_CONF="/etc/systemd/user.conf"
+    SYSTEM_CONF="/etc/systemd/system.conf"
+    LIMITS_CONF="/etc/security/limits.conf"
+    SYSCTL_CONF="/etc/sysctl.d/local.conf"
+    TEMP_USER_CONF=$(mktemp)
+    TEMP_SYSTEM_CONF=$(mktemp)
+
+    # تابع اضافه کردن خط در صورت عدم وجود
+    add_line_if_not_exists() {
+        local file="$1"
+        local line="$2"
+        local temp_file="$3"
+
+        if [ -f "$file" ]; then
+            cp "$file" "$temp_file"
+            if ! grep -q "$line" "$file"; then
+                sed -i '/^\[Manager\]/a '"$line" "$temp_file"
+                sudo mv "$temp_file" "$file"
+                echo "Added '$line' to $file"
+            else
+                echo "The line '$line' already exists in $file"
+                rm "$temp_file"
+            fi
+        else
+            echo "$file does not exist."
+            rm "$temp_file"
+        fi
+    }
+
+    # بهینه‌سازی user.conf
+    add_line_if_not_exists "$USER_CONF" "DefaultLimitNOFILE=1024000" "$TEMP_USER_CONF"
+
+    # بهینه‌سازی system.conf
+    add_line_if_not_exists "$SYSTEM_CONF" "DefaultLimitNOFILE=1024000" "$TEMP_SYSTEM_CONF"
+
+    # بهینه‌سازی limits.conf
+    if [ -f "$LIMITS_CONF" ]; then
+        cat <<EOF | sudo tee -a "$LIMITS_CONF"
+* hard nofile 1024000
+* soft nofile 1024000
+root hard nofile 1024000
+root soft nofile 1024000
+EOF
+        echo "Added limits to $LIMITS_CONF"
+    else
+        echo "$LIMITS_CONF does not exist."
+    fi
+
+    # بهینه‌سازی sysctl.d/local.conf
+    cat <<EOF | sudo tee "$SYSCTL_CONF"
+# max open files
+fs.file-max = 1024000
+EOF
+    echo "Added sysctl settings to $SYSCTL_CONF"
+
+    # اعمال تغییرات sysctl
+    sudo sysctl --system
+    echo "Sysctl changes applied."
+}
+
+# تابع نصب x-ui
+install_x_ui() {
+    echo "Choose the version of x-ui to install:"
+    echo "1) alireza"
+    echo "2) MHSanaei"
+    read -p "Select an option (1 or 2): " xui_choice
+
+    if [ "$xui_choice" -eq 1 ]; then
+        bash <(curl -Ls https://raw.githubusercontent.com/alireza0/x-ui/master/install.sh)
+        echo "alireza version of x-ui installed."
+    elif [ "$xui_choice" -eq 2 ]; then
+        bash <(curl -Ls https://raw.githubusercontent.com/mhsanaei/3x-ui/master/install.sh)
+        echo "MHSanaei version of x-ui installed."
+    else
+        echo "Invalid option. Please select 1 or 2."
+    fi
+}
+
+# تابع غیرفعال‌سازی IPv6
+disable_ipv6() {
+    commands=$(cat <<EOF
+sudo sysctl -w net.ipv6.conf.all.disable_ipv6=1
+sudo sysctl -w net.ipv6.conf.default.disable_ipv6=1
+sudo sysctl -w net.ipv6.conf.lo.disable_ipv6=1
+EOF
+)
+
+    eval "$commands"
+    echo "IPv6 has been disabled. This change is temporary and will revert after reboot."
+}
+
 # اجرای گزینه انتخاب شده
 case $server_choice in
     1)
@@ -103,18 +196,12 @@ ip -6 tunnel add GRE6Tun_To_KH mode ip6gre remote 2009:499:1d10:e1d::2 local 200
 ip addr add 180.18.18.1/30 dev GRE6Tun_To_KH
 ip link set GRE6Tun_To_KH mtu 1436
 ip link set GRE6Tun_To_KH up
-
-sysctl net.ipv4.ip_forward=1
-iptables -t nat -A PREROUTING -p tcp --dport 22 -j DNAT --to-destination 180.18.18.1
-iptables -t nat -A PREROUTING -j DNAT --to-destination 180.18.18.2
-iptables -t nat -A POSTROUTING -j MASQUERADE
 EOF
             )
 
             eval "$commands"
             setup_rc_local "$commands"
             echo "Commands executed for the Iran server."
-
         else
             echo "Invalid option. Please select 1 or 2."
         fi
@@ -122,39 +209,29 @@ EOF
     3)
         # حذف تونل‌ها
         echo "Removing tunnels..."
-        ip tunnel del 6to4_To_IR 2>/dev/null
-        ip -6 tunnel del GRE6Tun_To_IR 2>/dev/null
-        ip link del 6to4_To_IR 2>/dev/null
-        ip link del GRE6Tun_To_IR 2>/dev/null
-        iptables -t nat -D PREROUTING -j DNAT --to-destination 180.18.18.2 2>/dev/null
-        iptables -t nat -D POSTROUTING -j MASQUERADE 2>/dev/null
-        echo -e '#! /bin/bash\n\nexit 0' | sudo tee /etc/rc.local > /dev/null
-        sudo chmod +x /etc/rc.local
-        echo "Tunnels removed. /etc/rc.local is empty now."
+        sudo ip tunnel del 6to4_To_IR
+        sudo ip -6 tunnel del GRE6Tun_To_IR
+        echo "Tunnels removed."
         ;;
     4)
         # فعال‌سازی BBR
-        wget --no-check-certificate -O /opt/bbr.sh https://github.com/teddysun/across/raw/master/bbr.sh
-        chmod 755 /opt/bbr.sh
-        /opt/bbr.sh
-        echo "BBR optimization enabled."
+        echo "Activating BBR..."
+        sudo sysctl -w net.ipv4.tcp_congestion_control=bbr
+        echo "BBR activated."
         ;;
     5)
-        # تنظیم زمان واتساپ
-        commands="sudo timedatectl set-timezone Asia/Tehran"
-        setup_rc_local "$commands"
-        echo "Whatsapp time fixed to Asia/Tehran timezone."
+        # رفع مشکل زمان Whatsapp
+        echo "Fixing Whatsapp time issue..."
+        sudo timedatectl set-ntp true
+        echo "Whatsapp time issue fixed."
         ;;
     6)
         # بهینه‌سازی
-        echo "Optimizing system..."
-        wget -O optimize.sh "https://github.com/fscarmen/tools/raw/main/Optimize.sh" && chmod +x optimize.sh && ./optimize.sh
+        optimize
         ;;
     7)
         # نصب x-ui
-        echo "Installing x-ui..."
-        bash <(curl -Ls https://raw.githubusercontent.com/vaxilu/x-ui/master/install.sh)
-        echo "x-ui installed."
+        install_x_ui
         ;;
     8)
         # تغییر NameServer
@@ -165,10 +242,7 @@ EOF
         ;;
     9)
         # غیرفعال‌سازی IPv6
-        echo "Disabling IPv6..."
-        sudo sysctl -w net.ipv6.conf.all.disable_ipv6=1
-        sudo sysctl -w net.ipv6.conf.default.disable_ipv6=1
-        echo "IPv6 disabled. Note: It will be reactivated after reboot."
+        disable_ipv6
         ;;
     *)
         echo "Invalid option. Please select a number between 1 and 9."
