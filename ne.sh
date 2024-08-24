@@ -86,7 +86,7 @@ optimize() {
         local line="$2"
         local temp_file="$3"
 
-        if [ -f "$file" ];then
+        if [ -f "$file" ]; then
             cp "$file" "$temp_file"
             if ! grep -q "$line" "$file"; then
                 sed -i '/^\[Manager\]/a '"$line" "$temp_file"
@@ -109,7 +109,7 @@ optimize() {
     add_line_if_not_exists "$SYSTEM_CONF" "DefaultLimitNOFILE=1024000" "$TEMP_SYSTEM_CONF"
 
     # Optimize limits.conf
-    if [ -f "$LIMITS_CONF" ];then
+    if [ -f "$LIMITS_CONF" ]; then
         cat <<EOF | sudo tee -a "$LIMITS_CONF"
 * hard nofile 1024000
 * soft nofile 1024000
@@ -122,44 +122,15 @@ EOF
     fi
 
     # Optimize sysctl.d/local.conf
-    sudo bash -c "cat <<EOF > $SYSCTL_CONF
-fs.file-max = 2097152
-net.core.netdev_max_backlog = 262144
-net.core.rmem_default = 8388608
-net.core.rmem_max = 67108864
-net.core.somaxconn = 4096
-net.core.wmem_default = 8388608
-net.core.wmem_max = 67108864
-net.ipv4.ip_forward = 1
-net.ipv4.ip_local_port_range = 1024 65535
-net.ipv4.tcp_congestion_control = bbr
-net.ipv4.tcp_fin_timeout = 15
-net.ipv4.tcp_keepalive_time = 300
-net.ipv4.tcp_max_orphans = 3276800
-net.ipv4.tcp_max_syn_backlog = 262144
-net.ipv4.tcp_max_tw_buckets = 6000000
-net.ipv4.tcp_mem = 94500000 915000000 927000000
-net.ipv4.tcp_mtu_probing = 1
-net.ipv4.tcp_rmem = 4096 87380 67108864
-net.ipv4.tcp_retries2 = 8
-net.ipv4.tcp_sack = 1
-net.ipv4.tcp_syn_retries = 5
-net.ipv4.tcp_synack_retries = 2
-net.ipv4.tcp_timestamps = 1
-net.ipv4.tcp_tw_reuse = 1
-net.ipv4.tcp_wmem = 4096 65536 67108864
-net.ipv4.udp_mem = 65536 131072 262144
-net.ipv4.udp_rmem_min = 8192
-net.ipv4.udp_wmem_min = 8192
-vm.min_free_kbytes = 65536
-EOF"
+    cat <<EOF | sudo tee "$SYSCTL_CONF"
+# max open files
+fs.file-max = 1024000
+EOF
+    echo "Added sysctl settings to $SYSCTL_CONF"
 
-    sudo systemctl daemon-reload
-    sudo systemctl restart systemd-journald
-    sudo systemctl restart systemd
+    # Apply sysctl changes
     sudo sysctl --system
-
-    echo "System optimized successfully."
+    echo "Sysctl changes applied."
 }
 
 # Function to disable IPv6
