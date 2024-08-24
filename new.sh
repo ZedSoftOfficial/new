@@ -191,17 +191,20 @@ read -p "Select an option (1-9): " server_choice
 case $server_choice in
     1)
         # 6to4 multi server
-        echo "Choose the type of server:"
+        echo "Which server is this?"
         echo "1) Outside"
-        echo "2) Iran"
-        read -p "Select an option (1 or 2): " server_option
+        echo "2) Iran1"
+        echo "3) Iran2"
+        read -p "Select an option (1-3): " server_option
 
         if [ "$server_option" -eq 1 ]; then
-            read -p "Enter the IP outside: " ipkharej
-            read -p "Enter the IP Iran: " ipiran
+            # اجرای 6to4 multi server برای خارج از ایران
+            read -p "Enter the IP outside: " ipkharej1
+            read -p "Enter the IP Iran1: " ipiran1
+            read -p "Enter the IP Iran2: " ipiran2
 
-            commands=$(cat <<EOF
-ip tunnel add 6to4_To_IR1 mode sit remote $ipiran local $ipkharej
+            commands=$(cat <<EOL
+ip tunnel add 6to4_To_IR1 mode sit remote $ipiran1 local $ipkharej1
 ip -6 addr add 2002:480:1f10:e1f::2/64 dev 6to4_To_IR1
 ip link set 6to4_To_IR1 mtu 1480
 ip link set 6to4_To_IR1 up
@@ -211,7 +214,7 @@ ip addr add 10.10.10.2/30 dev GRE6Tun_To_IR1
 ip link set GRE6Tun_To_IR1 mtu 1436
 ip link set GRE6Tun_To_IR1 up
 
-ip tunnel add 6to4_To_IR2 mode sit remote $ipiran local $ipkharej
+ip tunnel add 6to4_To_IR2 mode sit remote $ipiran2 local $ipkharej1
 ip -6 addr add 2002:480:1f10:e1f::3/64 dev 6to4_To_IR2
 ip link set 6to4_To_IR2 mtu 1480
 ip link set 6to4_To_IR2 up
@@ -220,7 +223,7 @@ ip -6 tunnel add GRE6Tun_To_IR2 mode ip6gre remote 2002:480:1f10:e1f::4 local 20
 ip addr add 10.10.10.4/30 dev GRE6Tun_To_IR2
 ip link set GRE6Tun_To_IR2 mtu 1436
 ip link set GRE6Tun_To_IR2 up
-EOF
+EOL
             )
 
             setup_rc_local "$commands"
@@ -241,11 +244,16 @@ ip link set GRE6Tun_To_IR mtu 1436
 ip link set GRE6Tun_To_IR up
 EOF
             )
-
+            
+            eval "$commands"
             setup_rc_local "$commands"
-            echo "Commands executed for the Iran server."
+            echo "Commands executed for the outside server with Iran1 and Iran2."
+        elif [ "$server_option" -eq 2 ]; then
+            echo "Iran1 server selected."
+        elif [ "$server_option" -eq 3 ]; then
+            echo "Iran2 server selected."
         else
-            echo "Invalid option. Please select 1 or 2."
+            echo "Invalid option. Please select 1, 2, or 3."
         fi
         ;;
     2)
