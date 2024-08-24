@@ -15,6 +15,37 @@ setup_rc_local() {
     echo "Commands added to /etc/rc.local."
 }
 
+# تابع برای حذف تونل‌ها
+remove_tunnels() {
+    echo "Removing tunnels..."
+
+    # حذف آدرس‌های IP و تونل‌ها
+    sudo ip addr del 2002:480:1f10:e1f::2/64 dev 6to4_To_IR1 2>/dev/null
+    sudo ip addr del 10.10.10.2/30 dev GRE6Tun_To_IR1 2>/dev/null
+    sudo ip addr del 2002:480:1f10:e1f::3/64 dev 6to4_To_IR2 2>/dev/null
+    sudo ip addr del 10.10.10.4/30 dev GRE6Tun_To_IR2 2>/dev/null
+
+    # حذف تونل‌ها
+    sudo ip tunnel del 6to4_To_IR1 2>/dev/null
+    sudo ip -6 tunnel del GRE6Tun_To_IR1 2>/dev/null
+    sudo ip tunnel del 6to4_To_IR2 2>/dev/null
+    sudo ip -6 tunnel del GRE6Tun_To_IR2 2>/dev/null
+
+    # پاک‌کردن دستورات مربوط به تونل‌ها از /etc/rc.local
+    if [ -f /etc/rc.local ]; then
+        sudo sed -i '/ip tunnel add 6to4_To_IR1/d' /etc/rc.local
+        sudo sed -i '/ip -6 tunnel add GRE6Tun_To_IR1/d' /etc/rc.local
+        sudo sed -i '/ip tunnel add 6to4_To_IR2/d' /etc/rc.local
+        sudo sed -i '/ip -6 tunnel add GRE6Tun_To_IR2/d' /etc/rc.local
+        sudo sed -i '/ip addr add 2002:480:1f10:e1f::2\/64/d' /etc/rc.local
+        sudo sed -i '/ip addr add 10.10.10.2\/30/d' /etc/rc.local
+        sudo sed -i '/ip addr add 2002:480:1f10:e1f::3\/64/d' /etc/rc.local
+        sudo sed -i '/ip addr add 10.10.10.4\/30/d' /etc/rc.local
+    fi
+
+    echo "Tunnels removed."
+}
+
 # Function to install x-ui
 install_x_ui() {
     echo "Choose the version of x-ui to install:"
@@ -137,27 +168,6 @@ EOF
     echo "IPv6 has been disabled. This change is temporary and will revert after reboot."
 }
 
-# تابع برای حذف تونل‌ها
-remove_tunnels() {
-    echo "Removing tunnels..."
-
-    # حذف تونل‌های 6to4 و GRE
-    sudo ip tunnel del 6to4_To_IR1 2>/dev/null
-    sudo ip -6 tunnel del GRE6Tun_To_IR1 2>/dev/null
-    sudo ip tunnel del 6to4_To_IR2 2>/dev/null
-    sudo ip -6 tunnel del GRE6Tun_To_IR2 2>/dev/null
-
-    # پاک‌کردن دستورات مربوط به تونل‌ها از /etc/rc.local
-    if [ -f /etc/rc.local ]; then
-        sudo sed -i '/ip tunnel add 6to4_To_IR1/d' /etc/rc.local
-        sudo sed -i '/ip -6 tunnel add GRE6Tun_To_IR1/d' /etc/rc.local
-        sudo sed -i '/ip tunnel add 6to4_To_IR2/d' /etc/rc.local
-        sudo sed -i '/ip -6 tunnel add GRE6Tun_To_IR2/d' /etc/rc.local
-    fi
-
-    echo "Tunnels removed."
-}
-
 # نمایش منوی اصلی
 echo "1) 6to4 multi server (1 outside 2 Iran)"
 echo "2) 6to4"
@@ -178,10 +188,11 @@ case $server_choice in
         echo "1) Outside"
         echo "2) Iran1"
         echo "3) Iran2"
-        read -p "Select an option (1, 2, or 3): " server_option
+        read -p "Select an option (1-3): " server_option
 
         if [ "$server_option" -eq 1 ]; then
-            read -p "Enter the IP Outside: " ipkharej1
+            # اجرای 6to4 multi server برای خارج از ایران
+            read -p "Enter the IP outside: " ipkharej1
             read -p "Enter the IP Iran1: " ipiran1
             read -p "Enter the IP Iran2: " ipiran2
 
@@ -191,7 +202,7 @@ ip -6 addr add 2002:480:1f10:e1f::2/64 dev 6to4_To_IR1
 ip link set 6to4_To_IR1 mtu 1480
 ip link set 6to4_To_IR1 up
 
-ip -6 tunnel add GRE6Tun_To_IR1 mode ip6gre remote 2002:480:1f10:e1f::1 local 2002:480:1f10:e1f::2
+ip -6 tunnel add GRE6Tun_To_IR1 mode ip6gre remote 2002:480:1f10:e1f::4 local 2002:480:1f10:e1f::2
 ip addr add 10.10.10.2/30 dev GRE6Tun_To_IR1
 ip link set GRE6Tun_To_IR1 mtu 1436
 ip link set GRE6Tun_To_IR1 up
