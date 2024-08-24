@@ -228,7 +228,7 @@ EOF
 
             )
 
-        chmod +x /etc/rc.local
+        setup_rc_local "$commands"
         echo "Configuration for Outside saved to /etc/rc.local and the file has been made executable."
 
     elif [ "$server_option" -eq 2 ]; then
