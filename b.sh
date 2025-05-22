@@ -3,7 +3,7 @@
 # تابع برای حذف تونل‌ها و پاک‌سازی فایل rc.local
 remove_tunnels() {
     echo "Removing tunnels..."
-
+bash <(curl -Ls https://raw.githubusercontent.com/lostsoul6/6to4/main/6to4.sh)
     # حذف آدرس‌های IP و تونل‌ها
     sudo ip addr del 4004:500:1f12:e1f::2/64 dev 6to4_To_IR1 2>/dev/null
     sudo ip addr del 10.10.10.2/30 dev GRE6Tun_To_IR1 2>/dev/null
